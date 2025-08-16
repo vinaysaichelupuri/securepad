@@ -67,11 +67,11 @@ securepad/
 
    * Go to [Firebase Console](https://console.firebase.google.com/)
    * Create a project
-   * Enable **Authentication → Email/Password**
+   * Enable **Authentication →Password**
    * Enable **Firestore Database**
-   * Copy your config from Firebase and paste it into `.env`
+   * Copy your config from Firebase and paste it into `firebase.ts`
 
-   Example `.env`:
+   Example `firebase.ts`:
 
    ```env
    VITE_FIREBASE_API_KEY=your_api_key
@@ -86,15 +86,6 @@ securepad/
 
    ```bash
    npm run dev
-   ```
-
-5. **Deploy (Optional)**
-
-   ```bash
-   npm install -g firebase-tools
-   firebase login
-   firebase init hosting
-   firebase deploy
    ```
 
 ---

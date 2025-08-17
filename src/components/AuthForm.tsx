@@ -42,7 +42,8 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onAuthSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-between p-4">
+    <div className="min-h-screen">
+    <div className="h-[93vh] bg-black flex flex-col items-center justify-between p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -155,14 +156,21 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onAuthSuccess }) => {
           </motion.div>
         </div>
       </motion.div>
-
-      {/* Footer */}
-      <footer className="text-center text-xs text-gray-500 mt-6 mb-2">
-        <p>
-          Designed & Developed by{' '}
-          <span className="text-cyan-400 font-medium">Vinay Sai Chelupuri</span>
-        </p>
-      </footer>
     </div>
+    {/* Footer */}
+      <footer className="border-t border-gray-800 bg-gray-900/50 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-6">
+          <div className="text-center">
+            <p className="text-gray-400 text-sm">
+              Designed and Developed by{" "}
+              <span className="text-blue-400 font-semibold hover:text-blue-300 transition-colors">
+                Vinay Sai Chelupuri
+              </span>
+            </p>
+          </div>
+        </div>
+      </footer>
+     </div>
+    
   );
 };

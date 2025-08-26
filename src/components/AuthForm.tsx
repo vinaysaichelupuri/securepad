@@ -158,14 +158,19 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onAuthSuccess }) => {
       </motion.div>
     </div>
     {/* Footer */}
-      <footer className="border-t border-gray-800 bg-gray-900/50 backdrop-blur-sm">
+            <footer className="border-t border-gray-800 bg-gray-900/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-6">
           <div className="text-center">
             <p className="text-gray-400 text-sm">
               Designed and Developed by{" "}
-              <span className="text-blue-400 font-semibold hover:text-blue-300 transition-colors">
+              <a
+                href="https://in.linkedin.com/in/vinay-sai-chelupuri-085642277"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 font-semibold hover:text-blue-300 transition-colors"
+              >
                 Vinay Sai Chelupuri
-              </span>
+              </a>
             </p>
           </div>
         </div>

@@ -269,12 +269,19 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     loadDocument();
   }, [password]);
 
-  // Separate effect to set editor innerHTML when both content and ref are ready
+  // Separate effect to set editor innerHTML ONLY on initial load when ref becomes ready
   useEffect(() => {
-    if (editorRef.current && content && !loading) {
-      editorRef.current.innerHTML = content;
+    if (editorRef.current && content && loading === false) {
+      // Only set innerHTML if the editor is empty (initial load scenario)
+      // Don't set it if user is typing (editor already has content)
+      if (
+        !editorRef.current.textContent ||
+        editorRef.current.textContent.trim() === ""
+      ) {
+        editorRef.current.innerHTML = content;
+      }
     }
-  }, [content, loading]);
+  }, [loading]); // Only run when loading changes to false
 
   useEffect(() => {
     // Don't auto-save until initial load is complete

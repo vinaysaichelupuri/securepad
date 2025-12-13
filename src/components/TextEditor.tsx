@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase.ts';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LogOut, 
-  Save, 
-  Trash2, 
-  Check, 
+import React, { useState, useEffect, useRef } from "react";
+import { signOut } from "firebase/auth";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../firebase.ts";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  LogOut,
+  Save,
+  Trash2,
+  Check,
   Loader2,
   AlertTriangle,
-  Key
-} from 'lucide-react';
+  Key,
+} from "lucide-react";
+import { FormattingToolbar } from "./FormattingToolbar";
+import { searchEmojisByKeyword } from "../utils/emojiShortcodes";
 
 interface TextEditorProps {
   user: any;
@@ -19,39 +21,220 @@ interface TextEditorProps {
   onSignOut: () => void;
 }
 
-export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOut }) => {
-  const [content, setContent] = useState('');
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+export const TextEditor: React.FC<TextEditorProps> = ({
+  user,
+  password,
+  onSignOut,
+}) => {
+  const [content, setContent] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">(
+    "saved"
+  );
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [showEmojiSuggestions, setShowEmojiSuggestions] = useState(false);
+  const [emojiSuggestions, setEmojiSuggestions] = useState<
+    Array<{ shortcode: string; emoji: string }>
+  >([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const shortcodeStartRef = useRef<number | null>(null);
 
-  // Create a unique document ID based on the password hash
   const getDocumentId = (password: string) => {
-    // Simple hash function for demo purposes
     let hash = 0;
     for (let i = 0; i < password.length; i++) {
       const char = password.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
     }
     return `pad_${Math.abs(hash)}`;
   };
 
-  // Load user's document on mount
+  const updateFormattingState = () => {
+    setIsBold(document.queryCommandState("bold"));
+    setIsItalic(document.queryCommandState("italic"));
+  };
+
+  const handleFormat = (command: "bold" | "italic") => {
+    document.execCommand(command, false);
+    updateFormattingState();
+
+    if (editorRef.current) {
+      setContent(editorRef.current.innerHTML);
+    }
+  };
+
+  const insertEmoji = (emoji: string) => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+
+      const textNode = document.createTextNode(emoji + " ");
+      range.insertNode(textNode);
+
+      range.setStartAfter(textNode);
+      range.setEndAfter(textNode);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      if (editorRef.current) {
+        setContent(editorRef.current.innerHTML);
+        editorRef.current.focus();
+      }
+    }
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    insertEmoji(emoji);
+  };
+
+  const detectEmojiShortcode = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    const textNode = range.startContainer;
+
+    if (textNode.nodeType !== Node.TEXT_NODE) return;
+
+    const text = textNode.textContent || "";
+    const cursorPos = range.startOffset;
+
+    const textBeforeCursor = text.substring(0, cursorPos);
+    const lastColonIndex = textBeforeCursor.lastIndexOf(":");
+
+    if (lastColonIndex !== -1) {
+      const keyword = textBeforeCursor.substring(lastColonIndex + 1);
+
+      if (keyword.length > 0 && !keyword.includes(" ")) {
+        const suggestions = searchEmojisByKeyword(keyword);
+
+        if (suggestions.length > 0) {
+          setEmojiSuggestions(suggestions);
+          setShowEmojiSuggestions(true);
+          setSelectedSuggestionIndex(0);
+          shortcodeStartRef.current = lastColonIndex;
+          return;
+        }
+      }
+    }
+
+    setShowEmojiSuggestions(false);
+    shortcodeStartRef.current = null;
+  };
+
+  const insertEmojiFromShortcode = (emoji: string) => {
+    const selection = window.getSelection();
+    if (
+      !selection ||
+      selection.rangeCount === 0 ||
+      shortcodeStartRef.current === null
+    )
+      return;
+
+    const range = selection.getRangeAt(0);
+    const textNode = range.startContainer;
+
+    if (textNode.nodeType !== Node.TEXT_NODE) return;
+
+    const text = textNode.textContent || "";
+    const cursorPos = range.startOffset;
+
+    const newText =
+      text.substring(0, shortcodeStartRef.current) + text.substring(cursorPos);
+    textNode.textContent = newText;
+
+    range.setStart(textNode, shortcodeStartRef.current);
+    range.setEnd(textNode, shortcodeStartRef.current);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    insertEmoji(emoji);
+
+    setShowEmojiSuggestions(false);
+    shortcodeStartRef.current = null;
+  };
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      setContent(editorRef.current.innerHTML);
+    }
+    updateFormattingState();
+    detectEmojiShortcode();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Handle emoji autocomplete navigation
+    if (showEmojiSuggestions) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev < emojiSuggestions.length - 1 ? prev + 1 : prev
+        );
+        return;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : prev));
+        return;
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (emojiSuggestions[selectedSuggestionIndex]) {
+          insertEmojiFromShortcode(
+            emojiSuggestions[selectedSuggestionIndex].emoji
+          );
+        }
+        return;
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setShowEmojiSuggestions(false);
+        shortcodeStartRef.current = null;
+        return;
+      }
+    }
+
+    // Handle formatting shortcuts
+    if ((e.ctrlKey || e.metaKey) && e.key === "b") {
+      e.preventDefault();
+      handleFormat("bold");
+    } else if ((e.ctrlKey || e.metaKey) && e.key === "i") {
+      e.preventDefault();
+      handleFormat("italic");
+    }
+  };
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      updateFormattingState();
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, []);
+
   useEffect(() => {
     const loadDocument = async () => {
       try {
         const docId = getDocumentId(password);
-        const docRef = doc(db, 'pads', docId);
+        const docRef = doc(db, "pads", docId);
         const docSnap = await getDoc(docRef);
-        
+
         if (docSnap.exists()) {
-          setContent(docSnap.data().content || '');
+          const loadedContent = docSnap.data().content || "";
+          setContent(loadedContent);
+
+          if (editorRef.current) {
+            editorRef.current.innerHTML = loadedContent;
+          }
         }
       } catch (error) {
-        console.error('Error loading document:', error);
+        console.error("Error loading document:", error);
       } finally {
         setLoading(false);
       }
@@ -60,40 +243,40 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
     loadDocument();
   }, [password]);
 
-  // Auto-save functionality
   useEffect(() => {
     if (loading) return;
 
-    setSaveStatus('unsaved');
-    
-    // Clear existing timeout
+    setSaveStatus("unsaved");
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Set new timeout for auto-save
     saveTimeoutRef.current = setTimeout(async () => {
-      setSaveStatus('saving');
-      
+      setSaveStatus("saving");
+
       try {
         const docId = getDocumentId(password);
-        const docRef = doc(db, 'pads', docId);
-        await setDoc(docRef, {
-          content,
-          updatedAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
-          passwordHash: docId
-        }, { merge: true });
-        
-        setSaveStatus('saved');
-        
-        // Show saved status for 2 seconds
+        const docRef = doc(db, "pads", docId);
+        await setDoc(
+          docRef,
+          {
+            content,
+            updatedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            passwordHash: docId,
+          },
+          { merge: true }
+        );
+
+        setSaveStatus("saved");
+
         setTimeout(() => {
-          setSaveStatus('saved');
+          setSaveStatus("saved");
         }, 2000);
       } catch (error) {
-        console.error('Error saving document:', error);
-        setSaveStatus('unsaved');
+        console.error("Error saving document:", error);
+        setSaveStatus("unsaved");
       }
     }, 2000);
 
@@ -109,50 +292,56 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
       await signOut(auth);
       onSignOut();
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error("Error signing out:", error);
     }
   };
 
   const handleClear = async () => {
-    setContent('');
+    setContent("");
+    if (editorRef.current) {
+      editorRef.current.innerHTML = "";
+    }
     setShowClearConfirm(false);
-    
-    // Save the cleared content
-    setSaveStatus('saving');
+
+    setSaveStatus("saving");
     try {
       const docId = getDocumentId(password);
-      const docRef = doc(db, 'pads', docId);
-      await setDoc(docRef, {
-        content: '',
-        updatedAt: serverTimestamp(),
-        passwordHash: docId
-      }, { merge: true });
-      setSaveStatus('saved');
+      const docRef = doc(db, "pads", docId);
+      await setDoc(
+        docRef,
+        {
+          content: "",
+          updatedAt: serverTimestamp(),
+          passwordHash: docId,
+        },
+        { merge: true }
+      );
+      setSaveStatus("saved");
     } catch (error) {
-      console.error('Error clearing document:', error);
-      setSaveStatus('unsaved');
+      console.error("Error clearing document:", error);
+      setSaveStatus("unsaved");
     }
   };
 
   const getSaveStatusIcon = () => {
     switch (saveStatus) {
-      case 'saving':
+      case "saving":
         return <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />;
-      case 'saved':
+      case "saved":
         return <Check className="h-4 w-4 text-green-400" />;
-      case 'unsaved':
+      case "unsaved":
         return <Save className="h-4 w-4 text-gray-400" />;
     }
   };
 
   const getSaveStatusText = () => {
     switch (saveStatus) {
-      case 'saving':
-        return 'Saving...';
-      case 'saved':
-        return 'Saved';
-      case 'unsaved':
-        return 'Unsaved changes';
+      case "saving":
+        return "Saving...";
+      case "saved":
+        return "Saved";
+      case "unsaved":
+        return "Unsaved changes";
     }
   };
 
@@ -181,7 +370,6 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
             <div className="flex items-center gap-3">
               <Key className="h-6 w-6 text-cyan-400" />
               <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
@@ -189,9 +377,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
               </h1>
             </div>
 
-            {/* Status and Actions */}
             <div className="flex items-center gap-4">
-              {/* Save Status */}
               <motion.div
                 key={saveStatus}
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -199,18 +385,19 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
                 className="flex items-center gap-2 text-sm"
               >
                 {getSaveStatusIcon()}
-                <span className={`${
-                  saveStatus === 'saved' 
-                    ? 'text-green-400' 
-                    : saveStatus === 'saving'
-                    ? 'text-yellow-400'
-                    : 'text-gray-400'
-                }`}>
+                <span
+                  className={`${
+                    saveStatus === "saved"
+                      ? "text-green-400"
+                      : saveStatus === "saving"
+                      ? "text-yellow-400"
+                      : "text-gray-400"
+                  }`}
+                >
                   {getSaveStatusText()}
                 </span>
               </motion.div>
 
-              {/* Clear Button */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -221,7 +408,6 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
                 <Trash2 className="h-4 w-4" />
               </motion.button>
 
-              {/* Sign Out Button */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -236,24 +422,66 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
         </div>
       </motion.header>
 
+      {/* Formatting Toolbar */}
+      <FormattingToolbar
+        onFormat={handleFormat}
+        onEmojiSelect={handleEmojiSelect}
+        isBold={isBold}
+        isItalic={isItalic}
+      />
+
       {/* Main Editor */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="h-[calc(100vh-12rem)]"
+          className="h-[calc(100vh-16rem)] relative"
         >
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Start writing your secure notes here..."
-            className="w-full h-full bg-transparent border border-gray-700 rounded-2xl p-6 text-white placeholder-gray-500 resize-none focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all duration-300 font-mono text-sm md:text-base leading-relaxed"
+          <div
+            ref={editorRef}
+            contentEditable
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            className="w-full h-full bg-transparent border border-gray-700 rounded-2xl p-6 text-white resize-none focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all duration-300 text-sm md:text-base leading-relaxed overflow-y-auto"
             style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              fontFamily:
+                'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
             }}
+            data-placeholder="Start writing your secure notes here..."
           />
+
+          {/* Emoji Autocomplete Suggestions */}
+          <AnimatePresence>
+            {showEmojiSuggestions && emojiSuggestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-20 left-6 bg-gray-900 border border-cyan-400 rounded-lg shadow-2xl overflow-hidden z-[100] min-w-[250px]"
+              >
+                <div className="py-1">
+                  {emojiSuggestions.map((suggestion, index) => (
+                    <button
+                      key={`${suggestion.shortcode}-${index}`}
+                      onClick={() => insertEmojiFromShortcode(suggestion.emoji)}
+                      className={`w-full px-4 py-2 text-left flex items-center gap-3 transition-colors ${
+                        index === selectedSuggestionIndex
+                          ? "bg-cyan-500 text-white"
+                          : "text-gray-300 hover:bg-gray-800"
+                      }`}
+                    >
+                      <span className="text-xl">{suggestion.emoji}</span>
+                      <span className="text-sm">:{suggestion.shortcode}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-700">
+                  ↑↓ Navigate • Enter Select • Esc Close
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </main>
 
@@ -278,11 +506,12 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
                 <AlertTriangle className="h-6 w-6 text-yellow-400" />
                 <h3 className="text-lg font-semibold text-white">Clear Pad</h3>
               </div>
-              
+
               <p className="text-gray-400 mb-6">
-                Are you sure you want to clear all content? This action cannot be undone.
+                Are you sure you want to clear all content? This action cannot
+                be undone.
               </p>
-              
+
               <div className="flex gap-3">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -292,7 +521,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
                 >
                   Cancel
                 </motion.button>
-                
+
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -306,6 +535,26 @@ export const TextEditor: React.FC<TextEditorProps> = ({ user, password, onSignOu
           </motion.div>
         )}
       </AnimatePresence>
+
+      <style>{`
+        [contenteditable]:empty:before {
+          content: attr(data-placeholder);
+          color: #6b7280;
+          pointer-events: none;
+        }
+        
+        [contenteditable] b,
+        [contenteditable] strong {
+          font-weight: bold;
+        }
+        
+        [contenteditable] i,
+        [contenteditable] em {
+          font-style: italic;
+        }
+        
+
+      `}</style>
     </div>
   );
 };

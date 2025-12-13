@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from './firebase.ts';
-import { AuthForm } from './components/AuthForm';
-import { TextEditor } from './components/TextEditor';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { auth } from "./firebase.ts";
+import { AuthForm } from "./components/AuthForm";
+import { TextEditor } from "./components/TextEditor";
+import { motion, AnimatePresence } from "framer-motion";
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [password, setPassword] = useState<string>('');
+  const [password, setPassword] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ function App() {
 
   const handleSignOut = () => {
     setUser(null);
-    setPassword('');
+    setPassword("");
   };
 
   if (loading) {
@@ -41,7 +41,9 @@ function App() {
           <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
             SecurePad
           </h1>
-          <p className="text-gray-400 text-sm mt-2">Initializing secure environment...</p>
+          <p className="text-gray-400 text-sm mt-2">
+            Initializing secure environment...
+          </p>
         </motion.div>
       </div>
     );
@@ -58,7 +60,7 @@ function App() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.5 }}
           >
-            <TextEditor user={user} password={password} onSignOut={handleSignOut} />
+            <TextEditor password={password} onSignOut={handleSignOut} />
           </motion.div>
         ) : (
           <motion.div

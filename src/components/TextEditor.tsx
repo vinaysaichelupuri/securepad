@@ -16,13 +16,11 @@ import { FormattingToolbar } from "./FormattingToolbar";
 import { searchEmojisByKeyword } from "../utils/emojiShortcodes";
 
 interface TextEditorProps {
-  user: any;
   password: string;
   onSignOut: () => void;
 }
 
 export const TextEditor: React.FC<TextEditorProps> = ({
-  user,
   password,
   onSignOut,
 }) => {
@@ -161,7 +159,8 @@ export const TextEditor: React.FC<TextEditorProps> = ({
 
   const handleInput = () => {
     if (editorRef.current) {
-      setContent(editorRef.current.innerHTML);
+      const newContent = editorRef.current.innerHTML;
+      setContent(newContent);
     }
     updateFormattingState();
     detectEmojiShortcode();
@@ -206,6 +205,36 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     }
   };
 
+  // Handle paste to sanitize content
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+
+    // Get plain text from clipboard
+    const text = e.clipboardData.getData("text/plain");
+
+    // Insert as plain text
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+
+    // Insert plain text node
+    const textNode = document.createTextNode(text);
+    range.insertNode(textNode);
+
+    // Move cursor to end of inserted text
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    // Update content
+    if (editorRef.current) {
+      setContent(editorRef.current.innerHTML);
+    }
+  };
+
   useEffect(() => {
     const handleSelectionChange = () => {
       updateFormattingState();
@@ -228,13 +257,10 @@ export const TextEditor: React.FC<TextEditorProps> = ({
         if (docSnap.exists()) {
           const loadedContent = docSnap.data().content || "";
           setContent(loadedContent);
-
-          if (editorRef.current) {
-            editorRef.current.innerHTML = loadedContent;
-          }
+        } else {
         }
       } catch (error) {
-        console.error("Error loading document:", error);
+        console.error("[LOAD] Error loading document:", error);
       } finally {
         setLoading(false);
       }
@@ -243,8 +269,23 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     loadDocument();
   }, [password]);
 
+  // Separate effect to set editor innerHTML when both content and ref are ready
   useEffect(() => {
-    if (loading) return;
+    if (editorRef.current && content && !loading) {
+      editorRef.current.innerHTML = content;
+    }
+  }, [content, loading]);
+
+  useEffect(() => {
+    // Don't auto-save until initial load is complete
+    if (loading) {
+      return;
+    }
+
+    // Don't auto-save immediately after load - wait for actual user changes
+    if (content === "" && !editorRef.current?.textContent) {
+      return;
+    }
 
     setSaveStatus("unsaved");
 
@@ -261,10 +302,8 @@ export const TextEditor: React.FC<TextEditorProps> = ({
         await setDoc(
           docRef,
           {
-            content,
-            updatedAt: serverTimestamp(),
-            createdAt: serverTimestamp(),
-            passwordHash: docId,
+            content: content,
+            updatedAt: new Date().toISOString(),
           },
           { merge: true }
         );
@@ -443,6 +482,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             contentEditable
             onInput={handleInput}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             className="w-full h-full bg-transparent border border-gray-700 rounded-2xl p-6 text-white resize-none focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all duration-300 text-sm md:text-base leading-relaxed overflow-y-auto"
             style={{
               fontFamily:

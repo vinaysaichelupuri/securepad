@@ -1,5 +1,30 @@
-// Emoji shortcode mappings
-export const emojiShortcodes: Record<string, string> = {
+// Import custom emoji images
+import sadcatImg from "../assets/emojis/sadcat.jpg";
+import thumbsupCryingCatImg from "../assets/emojis/thumbsup_crying_cat.jpg";
+
+// Type definitions for emoji system
+export type ImageEmoji = {
+  type: "image";
+  src: string;
+  alt: string;
+};
+
+export type TextEmoji = {
+  type: "text";
+  value: string;
+};
+
+export type EmojiValue = string | ImageEmoji;
+
+export const emojiShortcodes: Record<string, EmojiValue> = {
+  // Custom Image Emojis
+  sadcat: { type: "image", src: sadcatImg, alt: "sad cat" },
+  sadcatthumbsup: {
+    type: "image",
+    src: thumbsupCryingCatImg,
+    alt: "crying cat thumbs up",
+  },
+
   // Greetings & Common
   hello: "👋",
   hi: "👋",
@@ -276,12 +301,25 @@ export const emojiShortcodes: Record<string, string> = {
   hundred: "💯",
 };
 
+// Helper function to check if an emoji is an image emoji
+export const isImageEmoji = (emoji: EmojiValue): emoji is ImageEmoji => {
+  return typeof emoji === "object" && emoji.type === "image";
+};
+
+// Helper function to get display value for autocomplete
+export const getEmojiDisplay = (emoji: EmojiValue): string | ImageEmoji => {
+  if (isImageEmoji(emoji)) {
+    return emoji;
+  }
+  return emoji;
+};
+
 // Search emojis by keyword
 export const searchEmojisByKeyword = (
   keyword: string
-): Array<{ shortcode: string; emoji: string }> => {
+): Array<{ shortcode: string; emoji: EmojiValue }> => {
   const lowerKeyword = keyword.toLowerCase();
-  const results: Array<{ shortcode: string; emoji: string }> = [];
+  const results: Array<{ shortcode: string; emoji: EmojiValue }> = [];
 
   for (const [shortcode, emoji] of Object.entries(emojiShortcodes)) {
     if (shortcode.includes(lowerKeyword)) {

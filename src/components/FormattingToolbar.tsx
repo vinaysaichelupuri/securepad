@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Bold, Italic, Smile } from "lucide-react";
 import { EmojiPicker } from "./EmojiPicker";
+import type { EmojiValue } from "../utils/emojiShortcodes";
 
 interface FormattingToolbarProps {
   onFormat: (command: "bold" | "italic") => void;
-  onEmojiSelect: (emoji: string) => void;
+  onEmojiSelect: (emoji: EmojiValue) => void;
   isBold: boolean;
   isItalic: boolean;
 }

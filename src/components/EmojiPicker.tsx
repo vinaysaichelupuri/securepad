@@ -1,14 +1,22 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X } from "lucide-react";
+import {
+  emojiShortcodes,
+  isImageEmoji,
+  type EmojiValue,
+} from "../utils/emojiShortcodes";
 
 interface EmojiPickerProps {
-  onEmojiSelect: (emoji: string) => void;
+  onEmojiSelect: (emoji: EmojiValue) => void;
   onClose: () => void;
   isOpen: boolean;
 }
 
 const emojiCategories = {
+  Custom: Object.entries(emojiShortcodes)
+    .filter(([_, emoji]) => isImageEmoji(emoji))
+    .map(([_, emoji]) => emoji),
   Smileys: [
     "😀",
     "😃",
@@ -494,7 +502,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
     };
   }, [isOpen, onClose]);
 
-  const handleEmojiClick = (emoji: string) => {
+  const handleEmojiClick = (emoji: EmojiValue) => {
     onEmojiSelect(emoji);
     onClose();
   };
@@ -507,7 +515,14 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
     // Search across all categories
     return Object.values(emojiCategories)
       .flat()
-      .filter((emoji) => emoji.includes(searchQuery));
+      .filter((emoji) => {
+        // For text emojis, search in the emoji itself
+        if (typeof emoji === "string") {
+          return emoji.includes(searchQuery);
+        }
+        // For image emojis, search in the alt text
+        return emoji.alt.toLowerCase().includes(searchQuery.toLowerCase());
+      });
   };
 
   const filteredEmojis = getFilteredEmojis();
@@ -572,13 +587,23 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
               <div className="grid grid-cols-8 gap-2">
                 {filteredEmojis.map((emoji, index) => (
                   <motion.button
-                    key={`${emoji}-${index}`}
+                    key={`${
+                      typeof emoji === "string" ? emoji : emoji.src
+                    }-${index}`}
                     whileHover={{ scale: 1.2 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={() => handleEmojiClick(emoji)}
-                    className="text-2xl hover:bg-gray-800 rounded-lg p-1 transition-colors duration-200"
+                    className="text-2xl hover:bg-gray-800 rounded-lg p-1 transition-colors duration-200 flex items-center justify-center"
                   >
-                    {emoji}
+                    {isImageEmoji(emoji) ? (
+                      <img
+                        src={emoji.src}
+                        alt={emoji.alt}
+                        className="h-6 w-6 object-contain"
+                      />
+                    ) : (
+                      emoji
+                    )}
                   </motion.button>
                 ))}
               </div>

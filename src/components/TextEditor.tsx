@@ -13,7 +13,11 @@ import {
   Key,
 } from "lucide-react";
 import { FormattingToolbar } from "./FormattingToolbar";
-import { searchEmojisByKeyword } from "../utils/emojiShortcodes";
+import {
+  searchEmojisByKeyword,
+  isImageEmoji,
+  type EmojiValue,
+} from "../utils/emojiShortcodes";
 
 interface TextEditorProps {
   password: string;
@@ -34,7 +38,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   const [isItalic, setIsItalic] = useState(false);
   const [showEmojiSuggestions, setShowEmojiSuggestions] = useState(false);
   const [emojiSuggestions, setEmojiSuggestions] = useState<
-    Array<{ shortcode: string; emoji: string }>
+    Array<{ shortcode: string; emoji: EmojiValue }>
   >([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
@@ -65,17 +69,40 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     }
   };
 
-  const insertEmoji = (emoji: string) => {
+  const insertEmoji = (emoji: EmojiValue) => {
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       range.deleteContents();
 
-      const textNode = document.createTextNode(emoji + " ");
-      range.insertNode(textNode);
+      let nodeToInsert: Node;
 
-      range.setStartAfter(textNode);
-      range.setEndAfter(textNode);
+      // Check if it's an image emoji
+      if (isImageEmoji(emoji)) {
+        // Create an img element for image emojis
+        const imgElement = document.createElement("img");
+        imgElement.src = emoji.src;
+        imgElement.alt = emoji.alt;
+        imgElement.className = "custom-emoji-image";
+        imgElement.style.height = "24px";
+        imgElement.style.display = "inline-block";
+        imgElement.style.verticalAlign = "text-bottom";
+        imgElement.style.margin = "0 2px";
+        nodeToInsert = imgElement;
+      } else {
+        // Create a text node for regular emojis
+        nodeToInsert = document.createTextNode(emoji + " ");
+      }
+
+      range.insertNode(nodeToInsert);
+
+      // Add a space after the emoji
+      const spaceNode = document.createTextNode(" ");
+      range.setStartAfter(nodeToInsert);
+      range.insertNode(spaceNode);
+
+      range.setStartAfter(spaceNode);
+      range.setEndAfter(spaceNode);
       selection.removeAllRanges();
       selection.addRange(range);
 
@@ -86,7 +113,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     }
   };
 
-  const handleEmojiSelect = (emoji: string) => {
+  const handleEmojiSelect = (emoji: EmojiValue) => {
     insertEmoji(emoji);
   };
 
@@ -125,7 +152,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     shortcodeStartRef.current = null;
   };
 
-  const insertEmojiFromShortcode = (emoji: string) => {
+  const insertEmojiFromShortcode = (emoji: EmojiValue) => {
     const selection = window.getSelection();
     if (
       !selection ||
@@ -518,7 +545,15 @@ export const TextEditor: React.FC<TextEditorProps> = ({
                           : "text-gray-300 hover:bg-gray-800"
                       }`}
                     >
-                      <span className="text-xl">{suggestion.emoji}</span>
+                      {isImageEmoji(suggestion.emoji) ? (
+                        <img
+                          src={suggestion.emoji.src}
+                          alt={suggestion.emoji.alt}
+                          className="h-6 w-6 object-contain"
+                        />
+                      ) : (
+                        <span className="text-xl">{suggestion.emoji}</span>
+                      )}
                       <span className="text-sm">:{suggestion.shortcode}</span>
                     </button>
                   ))}

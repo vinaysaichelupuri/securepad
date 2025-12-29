@@ -4,6 +4,7 @@ import { auth } from "./firebase.ts";
 import { AuthForm } from "./components/AuthForm";
 import { TextEditor } from "./components/TextEditor";
 import { motion, AnimatePresence } from "framer-motion";
+import VantaGlobeBackground from "./components/VantaGlobeBackground";
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -30,7 +31,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -50,7 +51,10 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen relative">
+      {/* Vanta Globe Background - persists across all views */}
+      <VantaGlobeBackground />
+
       <AnimatePresence mode="wait">
         {user && password ? (
           <motion.div
@@ -59,6 +63,7 @@ function App() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.5 }}
+            className="relative z-10"
           >
             <TextEditor password={password} onSignOut={handleSignOut} />
           </motion.div>
@@ -69,6 +74,7 @@ function App() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.5 }}
+            className="relative z-10"
           >
             <AuthForm onAuthSuccess={handleAuthSuccess} />
           </motion.div>
